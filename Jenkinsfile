@@ -24,22 +24,26 @@ pipeline {
             }
         }
 
-        stage('Build and Push One Image') {
+        stage('Build and Push Images') {
             steps {
                 script {
-                    // Find first Dockerfile and get its directory
-                    def firstDir = sh(
-                        script: "find src -type f -name Dockerfile -exec dirname {} \\; | head -n 1",
+                    def dockerDirs = sh(
+                        script: "find src -type f -name Dockerfile -exec dirname {} \\;",
                         returnStdout: true
-                    ).trim()
+                    ).trim().split('\n')
 
-                    def svc = firstDir.tokenize('/').last()
-                    echo "🔨 Building image for service: ${svc}"
-                    sh """
-                        cd ${firstDir}
-                        DOCKER_BUILDKIT=1 docker build -t $ECR_BASE/${svc}:$IMAGE_TAG --progress=plain .
-                        docker push $ECR_BASE/${svc}:$IMAGE_TAG
-                    """
+                    for (dir in dockerDirs) {
+                        def svc = dir.tokenize('/').last()
+                        echo "Building image for service: ${svc}"
+                        sh """
+                            cd ${dir}
+                            DOCKER_BUILDKIT=1 docker build -t $ECR_BASE/${svc}:$IMAGE_TAG --progress=plain .
+                        """
+                        echo "Pushing image for service: ${svc}"
+                        sh """
+                            docker push $ECR_BASE/${svc}:$IMAGE_TAG
+                        """
+                    }
                 }
             }
         }
@@ -70,3 +74,5 @@ pipeline {
         }
     }
 }
+
+

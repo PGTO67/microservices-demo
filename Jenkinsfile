@@ -12,7 +12,7 @@ pipeline {
     stages {
         stage('Checkout') {
             steps {
-                git 'https://github.com/PGTO67/microservices-demo.git'
+                git branch: 'main', url: 'https://github.com/PGTO67/microservices-demo.git'
             }
         }
 

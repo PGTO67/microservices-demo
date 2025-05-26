@@ -4,7 +4,7 @@ pipeline {
     environment {
         AWS_REGION = 'us-east-2'
         EKS_CLUSTER_NAME = 'EKSCICDonlineboutique'
-        AWS_ACCOUNT_ID = '123456789012'  // Replace with your AWS Account ID
+        AWS_ACCOUNT_ID = '123456789012' // Replace with your actual AWS Account ID
         ECR_BASE = "${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com"
         IMAGE_TAG = "${env.BUILD_NUMBER}"
     }
@@ -12,7 +12,7 @@ pipeline {
     stages {
         stage('Checkout') {
             steps {
-                git url: 'https://github.com/PGTO67/microservices-demo.git', branch: 'main'
+                git 'https://github.com/PGTO67/microservices-demo.git'
             }
         }
 
@@ -27,6 +27,7 @@ pipeline {
         stage('Build and Push Images') {
             steps {
                 script {
+                    // Find all directories containing Dockerfile under src/
                     def dockerDirs = sh(
                         script: "find src -type f -name Dockerfile -exec dirname {} \\;",
                         returnStdout: true
@@ -34,9 +35,10 @@ pipeline {
 
                     for (dir in dockerDirs) {
                         def svc = dir.tokenize('/').last()
+                        echo "Building and pushing image for service: ${svc}"
                         sh """
                             cd ${dir}
-                            docker build -t $ECR_BASE/${svc}:$IMAGE_TAG .
+                            docker build --platform linux/amd64 -t $ECR_BASE/${svc}:$IMAGE_TAG .
                             docker push $ECR_BASE/${svc}:$IMAGE_TAG
                         """
                     }
@@ -54,22 +56,9 @@ pipeline {
 
         stage('Deploy with Helm') {
             steps {
-                script {
-                    def dockerDirs = sh(
-                        script: "find src -type f -name Dockerfile -exec dirname {} \\;",
-                        returnStdout: true
-                    ).trim().split('\n')
-
-                    for (dir in dockerDirs) {
-                        def svc = dir.tokenize('/').last()
-                        // Assuming helm charts are in a 'helm' directory with service name subfolders
-                        sh """
-                            helm upgrade --install ${svc} helm/${svc} \
-                              --set image.repository=$ECR_BASE/${svc} \
-                              --set image.tag=$IMAGE_TAG
-                        """
-                    }
-                }
+                sh '''
+                    helm upgrade --install online-boutique ./helm/online-boutique --namespace default --set image.tag=$IMAGE_TAG
+                '''
             }
         }
     }

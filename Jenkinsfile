@@ -24,26 +24,22 @@ pipeline {
             }
         }
 
-        stage('Build and Push Images') {
+        stage('Build and Push One Image') {
             steps {
                 script {
-                    def dockerDirs = sh(
-                        script: "find src -type f -name Dockerfile -exec dirname {} \\;",
+                    // Find first Dockerfile and get its directory
+                    def firstDir = sh(
+                        script: "find src -type f -name Dockerfile -exec dirname {} \\; | head -n 1",
                         returnStdout: true
-                    ).trim().split('\n')
+                    ).trim()
 
-                    for (dir in dockerDirs) {
-                        def svc = dir.tokenize('/').last()
-                        echo "Building image for service: ${svc}"
-                        sh """
-                            cd ${dir}
-                            DOCKER_BUILDKIT=1 docker build -t $ECR_BASE/${svc}:$IMAGE_TAG --progress=plain .
-                        """
-                        echo "Pushing image for service: ${svc}"
-                        sh """
-                            docker push $ECR_BASE/${svc}:$IMAGE_TAG
-                        """
-                    }
+                    def svc = firstDir.tokenize('/').last()
+                    echo "🔨 Building image for service: ${svc}"
+                    sh """
+                        cd ${firstDir}
+                        DOCKER_BUILDKIT=1 docker build -t $ECR_BASE/${svc}:$IMAGE_TAG --progress=plain .
+                        docker push $ECR_BASE/${svc}:$IMAGE_TAG
+                    """
                 }
             }
         }

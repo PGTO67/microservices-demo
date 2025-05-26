@@ -4,7 +4,7 @@ pipeline {
     environment {
         AWS_REGION = 'us-east-2'
         EKS_CLUSTER_NAME = 'EKSCICDonlineboutique'
-        AWS_ACCOUNT_ID = '123456789012' // Replace with your actual AWS Account ID
+        AWS_ACCOUNT_ID = '123456789012'
         ECR_BASE = "${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com"
         IMAGE_TAG = "${env.BUILD_NUMBER}"
     }
@@ -27,7 +27,6 @@ pipeline {
         stage('Build and Push Images') {
             steps {
                 script {
-                    // Find all directories containing Dockerfile under src/
                     def dockerDirs = sh(
                         script: "find src -type f -name Dockerfile -exec dirname {} \\;",
                         returnStdout: true
@@ -38,7 +37,7 @@ pipeline {
                         echo "Building and pushing image for service: ${svc}"
                         sh """
                             cd ${dir}
-                            DOCKER_BUILDKIT=1 docker build --platform linux/amd64 -t $ECR_BASE/${svc}:$IMAGE_TAG .
+                            docker build -t $ECR_BASE/${svc}:$IMAGE_TAG .
                             docker push $ECR_BASE/${svc}:$IMAGE_TAG
                         """
                     }

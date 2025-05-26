@@ -34,10 +34,13 @@ pipeline {
 
                     for (dir in dockerDirs) {
                         def svc = dir.tokenize('/').last()
-                        echo "Building and pushing image for service: ${svc}"
+                        echo "Building image for service: ${svc}"
                         sh """
                             cd ${dir}
-                            DOCKER_BUILDKIT=1 docker build -t $ECR_BASE/${svc}:$IMAGE_TAG .
+                            DOCKER_BUILDKIT=1 docker build -t $ECR_BASE/${svc}:$IMAGE_TAG --progress=plain .
+                        """
+                        echo "Pushing image for service: ${svc}"
+                        sh """
                             docker push $ECR_BASE/${svc}:$IMAGE_TAG
                         """
                     }

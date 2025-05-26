@@ -37,7 +37,7 @@ pipeline {
                         echo "Building and pushing image for service: ${svc}"
                         sh """
                             cd ${dir}
-                            docker build -t $ECR_BASE/${svc}:$IMAGE_TAG .
+                            DOCKER_BUILDKIT=1 docker build -t $ECR_BASE/${svc}:$IMAGE_TAG .
                             docker push $ECR_BASE/${svc}:$IMAGE_TAG
                         """
                     }

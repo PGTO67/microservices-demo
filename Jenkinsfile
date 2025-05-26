@@ -12,7 +12,7 @@ pipeline {
     stages {
         stage('Checkout') {
             steps {
-                git 'https://github.com/PGTO67/microservices-demo.git'
+                git branch: 'main', url: 'https://github.com/PGTO67/microservices-demo.git'
             }
         }
 
@@ -51,7 +51,6 @@ pipeline {
         stage('Deploy to EKS') {
             steps {
                 script {
-                    // Replace images in manifest files with latest tag (optional)
                     sh '''
                         for svc in productcatalogservice recommendationservice frontend; do
                           sed -i "s|IMAGE_PLACEHOLDER|$ECR_BASE/$svc:$IMAGE_TAG|g" k8s/$svc-deployment.yaml

@@ -2,27 +2,24 @@ pipeline {
     agent any
 
     environment {
-        AWS_REGION = 'us-east-2'
-        ECR_ACCOUNT_ID = '982105689473'  // Your AWS Account ID
-        ECR_REPO_NAME = 'your-ecr-repo-name' // Change to your ECR repo name
-        IMAGE_TAG = "${env.BUILD_NUMBER}"
-        KUBECONFIG = '/var/lib/jenkins/.kube/config'
+        ECR_REPO = '982105689473.dkr.ecr.us-east-2.amazonaws.com/your-ecr-repo-name'
+        IMAGE_TAG = '1'
     }
 
     stages {
-        stage('Checkout Code') {
+        stage('Checkout SCM') {
             steps {
                 checkout([$class: 'GitSCM',
-                    branches: [[name: 'refs/heads/main']],
-                    userRemoteConfigs: [[url: 'https://github.com/PGTO67/microservices-demo.git']]
-                ])
+                          branches: [[name: '*/main']],
+                          userRemoteConfigs: [[url: 'https://github.com/PGTO67/microservices-demo.git']]])
             }
         }
 
         stage('Build Docker Image') {
             steps {
                 script {
-                    dockerImage = docker.build("${ECR_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${ECR_REPO_NAME}:${IMAGE_TAG}")
+                    // Update the path here if your Dockerfile is not at repo root
+                    sh "docker build -t ${ECR_REPO}:${IMAGE_TAG} ./docker"
                 }
             }
         }
@@ -31,7 +28,7 @@ pipeline {
             steps {
                 script {
                     sh '''
-                    aws ecr get-login-password --region ${AWS_REGION} | docker login --username AWS --password-stdin ${ECR_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com
+                    aws ecr get-login-password --region us-east-2 | docker login --username AWS --password-stdin 982105689473.dkr.ecr.us-east-2.amazonaws.com
                     '''
                 }
             }
@@ -40,19 +37,15 @@ pipeline {
         stage('Push Docker Image') {
             steps {
                 script {
-                    dockerImage.push()
+                    sh "docker push ${ECR_REPO}:${IMAGE_TAG}"
                 }
             }
         }
 
         stage('Deploy to EKS') {
             steps {
-                script {
-                    sh '''
-                    kubectl --kubeconfig ${KUBECONFIG} set image deployment/your-deployment-name your-container-name=${ECR_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${ECR_REPO_NAME}:${IMAGE_TAG}
-                    kubectl --kubeconfig ${KUBECONFIG} rollout status deployment/your-deployment-name
-                    '''
-                }
+                echo 'Deploying to EKS...'
+                // Your kubectl deploy commands here
             }
         }
     }

@@ -3,48 +3,45 @@ pipeline {
 
     environment {
         AWS_REGION = 'us-east-2'
-        EKS_CLUSTER_NAME = 'EKSCICDonlineboutique'
-        AWS_ACCOUNT_ID = '123456789012' // <-- Replace with your AWS Account ID
-        ECR_BASE = "${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com"
+        ECR_ACCOUNT_ID = '982105689473'  // Your AWS Account ID
+        ECR_REPO_NAME = 'your-ecr-repo-name' // Change to your repo
         IMAGE_TAG = "${env.BUILD_NUMBER}"
+        KUBECONFIG = '/var/lib/jenkins/.kube/config'
     }
 
     stages {
-        stage('Checkout') {
+        stage('Checkout Code') {
             steps {
-                git branch: 'main', url: 'https://github.com/PGTO67/microservices-demo.git'
+                checkout([$class: 'GitSCM',
+                    branches: [[name: 'refs/heads/main']],
+                    userRemoteConfigs: [[url: 'git@github.com:your_org/your_repo.git']]
+                ])
+            }
+        }
+
+        stage('Build Docker Image') {
+            steps {
+                script {
+                    dockerImage = docker.build("${ECR_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${ECR_REPO_NAME}:${IMAGE_TAG}")
+                }
             }
         }
 
         stage('Login to ECR') {
             steps {
-                sh '''
-                    aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $ECR_BASE
-                '''
-            }
-        }
-
-        stage('Build and Push Images') {
-            steps {
                 script {
-                    def services = ['productcatalogservice', 'recommendationservice', 'frontend']
-                    for (svc in services) {
-                        sh """
-                            cd src/${svc}
-                            docker build -t $ECR_BASE/${svc}:$IMAGE_TAG .
-                            docker push $ECR_BASE/${svc}:$IMAGE_TAG
-                            cd -
-                        """
-                    }
+                    sh '''
+                    aws ecr get-login-password --region ${AWS_REGION} | docker login --username AWS --password-stdin ${ECR_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com
+                    '''
                 }
             }
         }
 
-        stage('Update Kubeconfig') {
+        stage('Push Docker Image') {
             steps {
-                sh '''
-                    aws eks --region $AWS_REGION update-kubeconfig --name $EKS_CLUSTER_NAME
-                '''
+                script {
+                    dockerImage.push()
+                }
             }
         }
 
@@ -52,22 +49,11 @@ pipeline {
             steps {
                 script {
                     sh '''
-                        for svc in productcatalogservice recommendationservice frontend; do
-                          sed -i "s|IMAGE_PLACEHOLDER|$ECR_BASE/$svc:$IMAGE_TAG|g" k8s/$svc-deployment.yaml
-                          kubectl apply -f k8s/$svc-deployment.yaml
-                        done
+                    kubectl --kubeconfig ${KUBECONFIG} set image deployment/your-deployment-name your-container-name=${ECR_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${ECR_REPO_NAME}:${IMAGE_TAG}
+                    kubectl --kubeconfig ${KUBECONFIG} rollout status deployment/your-deployment-name
                     '''
                 }
             }
-        }
-    }
-
-    post {
-        success {
-            echo "✅ CI/CD pipeline completed successfully!"
-        }
-        failure {
-            echo "❌ CI/CD pipeline failed!"
         }
     }
 }

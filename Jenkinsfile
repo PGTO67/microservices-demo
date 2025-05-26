@@ -1,11 +1,14 @@
 pipeline {
     agent any
 
+    options {
+        timestamps()
+        skipStagesAfterUnstable()
+    }
+
     environment {
         AWS_REGION = 'us-east-2'
         EKS_CLUSTER_NAME = 'EKSCICDonlineboutique'
-        AWS_ACCOUNT_ID = '123456789012'
-        ECR_BASE = "${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com"
         IMAGE_TAG = "${env.BUILD_NUMBER}"
     }
 
@@ -16,9 +19,20 @@ pipeline {
             }
         }
 
+        stage('Configure AWS Credentials') {
+            steps {
+                withCredentials([string(credentialsId: 'aws-account-id', variable: 'AWS_ACCOUNT_ID')]) {
+                    script {
+                        env.ECR_BASE = "${AWS_ACCOUNT_ID}.dkr.ecr.${env.AWS_REGION}.amazonaws.com"
+                    }
+                }
+            }
+        }
+
         stage('Login to ECR') {
             steps {
                 sh '''
+                    set -e
                     aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $ECR_BASE
                 '''
             }
@@ -28,22 +42,27 @@ pipeline {
             steps {
                 script {
                     def dockerDirs = sh(
-                        script: "find src -type f -name Dockerfile -exec dirname {} \\;",
+                        script: "find src -type f -name Dockerfile -exec dirname {} \\; | sort -u",
                         returnStdout: true
                     ).trim().split('\n')
 
+                    def builds = [:]
+
                     for (dir in dockerDirs) {
                         def svc = dir.tokenize('/').last()
-                        echo "Building image for service: ${svc}"
-                        sh """
-                            cd ${dir}
-                            DOCKER_BUILDKIT=1 docker build -t $ECR_BASE/${svc}:$IMAGE_TAG --progress=plain .
-                        """
-                        echo "Pushing image for service: ${svc}"
-                        sh """
-                            docker push $ECR_BASE/${svc}:$IMAGE_TAG
-                        """
+
+                        builds[svc] = {
+                            echo "🔨 Building and pushing image for service: ${svc}"
+                            sh """
+                                set -e
+                                cd ${dir}
+                                DOCKER_BUILDKIT=1 docker build -t $ECR_BASE/${svc}:$IMAGE_TAG --progress=plain .
+                                docker push $ECR_BASE/${svc}:$IMAGE_TAG
+                            """
+                        }
                     }
+
+                    parallel builds
                 }
             }
         }
@@ -51,7 +70,17 @@ pipeline {
         stage('Update Kubeconfig') {
             steps {
                 sh '''
+                    set -e
                     aws eks --region $AWS_REGION update-kubeconfig --name $EKS_CLUSTER_NAME
+                '''
+            }
+        }
+
+        stage('Helm Diff (Preview Changes)') {
+            steps {
+                sh '''
+                    helm repo update
+                    helm diff upgrade online-boutique ./helm/online-boutique --namespace default --set global.image.tag=$IMAGE_TAG || true
                 '''
             }
         }
@@ -59,7 +88,10 @@ pipeline {
         stage('Deploy with Helm') {
             steps {
                 sh '''
-                    helm upgrade --install online-boutique ./helm/online-boutique --namespace default --set image.tag=$IMAGE_TAG
+                    set -e
+                    helm upgrade --install online-boutique ./helm/online-boutique \
+                        --namespace default \
+                        --set global.image.tag=$IMAGE_TAG
                 '''
             }
         }
@@ -74,5 +106,3 @@ pipeline {
         }
     }
 }
-
-

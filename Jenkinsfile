@@ -4,7 +4,7 @@ pipeline {
     environment {
         AWS_REGION = 'us-east-2'
         ECR_ACCOUNT_ID = '982105689473'  // Your AWS Account ID
-        ECR_REPO_NAME = 'your-ecr-repo-name' // Change to your repo
+        ECR_REPO_NAME = 'your-ecr-repo-name' // Change to your ECR repo name
         IMAGE_TAG = "${env.BUILD_NUMBER}"
         KUBECONFIG = '/var/lib/jenkins/.kube/config'
     }
@@ -14,7 +14,7 @@ pipeline {
             steps {
                 checkout([$class: 'GitSCM',
                     branches: [[name: 'refs/heads/main']],
-                    userRemoteConfigs: [[url: 'git@github.com:your_org/your_repo.git']]
+                    userRemoteConfigs: [[url: 'https://github.com/PGTO67/microservices-demo.git']]
                 ])
             }
         }

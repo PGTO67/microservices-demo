@@ -41,8 +41,13 @@ pipeline {
         sh '''
         echo ">>> Applying Kubernetes manifests for microservices-demo"
 
-        # Adjust this path if your manifests are elsewhere
-        kubectl --kubeconfig "$KUBECONFIG" apply -f kubernetes-manifests/
+        if [ -f kubernetes-manifests/kustomization.yaml ]; then
+          echo ">>> kustomization.yaml found — using 'kubectl apply -k kubernetes-manifests/'"
+          kubectl --kubeconfig "$KUBECONFIG" apply -k kubernetes-manifests/
+        else
+          echo ">>> No kustomization.yaml — using 'kubectl apply -f kubernetes-manifests/'"
+          kubectl --kubeconfig "$KUBECONFIG" apply -f kubernetes-manifests/
+        fi
 
         echo ">>> Current pods across all namespaces:"
         kubectl --kubeconfig "$KUBECONFIG" get pods -A

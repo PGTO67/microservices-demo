@@ -4,14 +4,18 @@ pipeline {
   environment {
     AWS_REGION   = "us-east-2"
     CLUSTER_NAME = "online-boutique"
-    // Use a kubeconfig file in the workspace so it works for the Jenkins user
+    // Store kubeconfig in the Jenkins workspace
     KUBECONFIG   = "${env.WORKSPACE}/kubeconfig"
+  }
+
+  options {
+    timestamps()
   }
 
   stages {
     stage('Checkout') {
       steps {
-        // Jenkins will use the SCM config from the job
+        // Uses the same SCM config you set in the Jenkins job
         checkout scm
       }
     }
@@ -22,12 +26,12 @@ pipeline {
         echo ">>> Updating kubeconfig for EKS cluster $CLUSTER_NAME in $AWS_REGION"
 
         aws eks update-kubeconfig \
-          --region $AWS_REGION \
-          --name $CLUSTER_NAME \
-          --kubeconfig $KUBECONFIG
+          --region "$AWS_REGION" \
+          --name "$CLUSTER_NAME" \
+          --kubeconfig "$KUBECONFIG"
 
         echo ">>> Verifying cluster access from Jenkins agent..."
-        kubectl --kubeconfig $KUBECONFIG get nodes
+        kubectl --kubeconfig "$KUBECONFIG" get nodes
         '''
       }
     }
@@ -37,11 +41,11 @@ pipeline {
         sh '''
         echo ">>> Applying Kubernetes manifests for microservices-demo"
 
-        # Adjust this path if your manifests are somewhere else
-        kubectl --kubeconfig $KUBECONFIG apply -f kubernetes-manifests/
+        # Adjust this path if your manifests are elsewhere
+        kubectl --kubeconfig "$KUBECONFIG" apply -f kubernetes-manifests/
 
         echo ">>> Current pods across all namespaces:"
-        kubectl --kubeconfig $KUBECONFIG get pods -A
+        kubectl --kubeconfig "$KUBECONFIG" get pods -A
         '''
       }
     }

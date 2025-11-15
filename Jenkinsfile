@@ -54,6 +54,23 @@ pipeline {
         '''
       }
     }
+   stage('Post-Deploy Info') {
+    steps {
+        echo ">>> Fetching Online Boutique LoadBalancer URL..."
+        script {
+            def lb = sh(
+                script: "kubectl --kubeconfig '${KUBECONFIG_FILE}' get service frontend-external -o jsonpath='{.status.loadBalancer.ingress[0].hostname}'",
+                returnStdout: true
+            ).trim()
+
+            echo "==============================================="
+            echo " Online Boutique deployment finished!"
+            echo " Application URL:"
+            echo " http://${lb}"
+            echo "==============================================="
+      }
+    }
+
   }
 }
 
